@@ -1,5 +1,13 @@
 # League of Legends Auto Move
 
+## Usage
+
+### 自動列隊、自動接受、自動投降、自動再來一場
+
+1. 投降時間可調
+2. 循環場數可調
+3. 按鍵座標可重新設定
+
 ## Functions I tried
 
 ```python

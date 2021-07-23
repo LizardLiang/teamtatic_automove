@@ -13,45 +13,61 @@ class Auto_Move:
         self.wait_time = wait_time
         self.loop_time = loop_time
         self.positions = positions
+        self.is_playing = False
+        self.timeup = False
 
-    def CountDown():
-        print("將於 分鐘後進行投降".format(wait_time))
-        time.sleep(math.floor(wait_time * 60))
+    def CountDown(self):
+        print("將於 分鐘後進行投降".format(self.wait_time))
+        time.sleep(math.floor(self.wait_time * 60))
+        self.timeup = True
         print("開始投降")
 
     def Start_Loop(self):
         loop_cnt = 0
+        
+        # 三個狀態 三個線程
         queue_t = threading.Thread(target=self.Do_Queue)
         play_t = threading.Thread(target=self.Do_Play)
         countdown_t = threading.Thread(target=self.CountDown)
-        is_finish = False
-
+        
+        # 依照使用者輸入 進行場次的對戰
         while loop_cnt < self.loop_time:
-            is_playing = False
             for proc in psutil.process_iter():
-                if proc.name() == "League of Legends.exe" and not is_Finish:
+                if proc.name() == "League of Legends.exe" and not self.is_playing:
+                    # 找到這個執行緒 代表遊戲開始
                     queue_t.do_run = False
-                    is_playing = True
-            if is_playing:
+                    self.is_playing = True
+
+            if self.is_playing:
                 # 跑等投降
                 if not play_t.is_alive():
                     countdown_t.start()
                     play_t.do_run = True
                     play_t.start()
-                    is_Finish = True
-                pass
+                    loop_cnt = loop_cnt + 1
+                elif self.timeup:
+                    # 如果正在玩 且 正在等待投降 且 時間到了
+                    play_t.do_run = False
+
             else:
                 # 跑列隊
                 if not queue_t.is_alive():
-                    is_Finish = False
+                    print("第 {} 場掛機".format(loop_cnt))
                     queue_t.do_run = True
                     queue_t.start()
 
     def Do_Queue(self):
         # 列隊中
+        print("開始列隊")
         t = threading.currentThread()
 
         while getattr(t, "do_run", True):
+            # 點擊 開始遊戲
+            pyautogui.moveTo(
+                self.positions["new_game"][0], self.positions["new_game"][1]
+            )
+            pyautogui.click()
+            time.sleep(5)
             # 點擊 開始遊戲
             pyautogui.moveTo(self.positions["start"][0], self.positions["start"][1])
             pyautogui.click()
@@ -64,6 +80,7 @@ class Auto_Move:
 
     def Do_Play(self):
         # 遊玩中
+        print("進入對戰")
         t = threading.currentThread()
         while getattr(t, "do_run", True):
             pyautogui.move(250, 0)
@@ -75,17 +92,21 @@ class Auto_Move:
             pyautogui.click(button="right")
             time.sleep(5)
 
+        print("對戰結束，進行下一場對戰")
         pyautogui.press("esc")
-        time.sleep(1)
+        time.sleep(3)
         pyautogui.moveTo(self.positions["surrender"][0], self.positions["surrender"][1])
-        time.sleep(1)
+        time.sleep(3)
         pyautogui.click()
-        time.sleep(1)
+        time.sleep(3)
         pyautogui.moveTo(
             self.positions["sur_accept"][0], self.positions["sur_accept"][1]
         )
-        time.sleep(1)
+        time.sleep(3)
         pyautogui.click()
+
+        # 遊戲結束 轉為列隊
+        self.is_playing = False
 
 
 class Create_Setting:
@@ -159,8 +180,14 @@ if __name__ == "__main__":
             )
         elif val == "1":
             wait_time = input("輸入投降時間 單位: 分鐘\r\n")
-            loop_time = input("輸入掛機場數\r\n")
+            if wait_time == "":
+                wait_time = 13
 
+            loop_time = input("輸入掛機場數\r\n")
+            if loop_time == "":
+                loop_time = 10
+
+            print("本次掛機將在 {}分鐘後進行投降，並且遊玩 {}場".format(float(wait_time), int(loop_time)))
             auto_move = Auto_Move(
                 float(wait_time), int(loop_time), create_setting.Get_Setting()
             )
