@@ -32,11 +32,19 @@
 		[650, 460]
 	],
 	"room": [450, 198],
+	"close_setting": [1360, 220],
 	"walk-cooldown": 3,
 	"walk-time": 3,
 	"click-wait": 0.1,
 	"drag-wait": 0.5,
 	"move-wait": 1,
 	"walk-wait": 3,
-	"proc-wait": 1
+	"proc-wait": 1,
+	"default": {
+		"surrender-time": 13,
+		"loop-times": 5,
+		"client-reso": 2,
+		"monitor-reso": 1,
+		"action": 0
+	}
 }
