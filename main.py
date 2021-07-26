@@ -1,6 +1,7 @@
 import psutil
 import pyautogui
 from pynput import mouse
+from pynput.mouse import Button
 import time
 import threading
 import json
@@ -29,7 +30,7 @@ class Auto_Move:
         button = "right" if right else "left"
         pyautogui.mouseDown(button=button)
         time.sleep(self.click_wait)
-        pyautogui.mouseUp()
+        pyautogui.mouseUp(button=button)
 
     def CountDown(self):
         print("將於 {}分鐘後進行投降".format(self.wait_time))
@@ -50,7 +51,6 @@ class Auto_Move:
             for proc in psutil.process_iter():
                 if proc.name() == game_name and not self.is_playing:
                     # 找到這個執行緒 代表遊戲開始
-                    queue_t.do_run = False
                     self.is_playing = True
 
             if self.is_playing:
@@ -60,11 +60,11 @@ class Auto_Move:
                     countdown_t = threading.Thread(target=self.CountDown)
                     self.timeup = False
                     countdown_t.start()
-                    play_t.do_run = True
                     play_t.start()
+                    while not play_t.is_alive():
+                        pass
                 elif self.timeup:
                     # 如果正在玩 且 正在等待投降 且 時間到了
-                    play_t.do_run = False
                     tmp = True
                     while tmp or play_t.is_alive():
                         tmp = False
@@ -80,8 +80,9 @@ class Auto_Move:
                 if not queue_t.is_alive():
                     queue_t = threading.Thread(target=self.Do_Queue)
                     print("第 {} 場掛機".format(loop_cnt + 1))
-                    queue_t.do_run = True
                     queue_t.start()
+                    while not queue_t.is_alive():
+                        pass
 
     def Do_Queue(self):
         # 列隊中
@@ -89,9 +90,7 @@ class Auto_Move:
         t = threading.currentThread()
 
         room_cnt = 0
-        self.MoveTo(self.positions["room"])
-        self.Press_Mouse()
-        while getattr(t, "do_run", True):
+        while not self.is_playing:
             # 點擊 開始遊戲
             self.MoveTo(self.positions["new_game"])
             self.Press_Mouse()
@@ -115,11 +114,11 @@ class Auto_Move:
         print("進入對戰")
         t = threading.currentThread()
         wander_cnt = 0
-        while getattr(t, "do_run", True):
-            if wander_cnt > (1800):
+        while not self.timeup:
+            if wander_cnt > self.positions["walk-cooldown"] and self.actions != 0:
                 wander_cnt = 0
                 self.Wandering()
-                if not getattr(t, "do_run", True):
+                if self.timeup:
                     break
             else:
                 wander_cnt = wander_cnt + 1
@@ -128,7 +127,7 @@ class Auto_Move:
                 self.D_Card()
             elif self.actions == 2:
                 self.Shops()
-                if not getattr(t, "do_run", True):
+                if not self.timeup:
                     break
                 self.Sell_Card()
             elif self.actions == 3:
@@ -182,6 +181,7 @@ class Auto_Move:
 
     def Wandering(self):
         for index, pos in enumerate(self.positions["wandering"]):
+            print(pos)
             self.WalkThere(pos)
             time.sleep(self.walk_wait)
 
@@ -206,24 +206,6 @@ class Create_Setting:
     def __init__(self):
         self.file = None
         self.setting = {}
-        self.record_cnt = 0
-
-    def on_click(self, x, y, button, pressed):
-        if mouse.Button.left == button:
-            if not pressed:
-                if self.record_cnt == 0:
-                    self.setting["start"] = (x, y)
-                    print("請點擊接受")
-                elif self.record_cnt == 1:
-                    self.setting["accept"] = (x, y)
-                    jsonfile = json.dumps(self.setting)
-
-                    print("校正完畢")
-
-                    self.file.write(jsonfile)
-                    self.file.close()
-                    return False
-                self.record_cnt = self.record_cnt + 1
 
     def Open_File(self):
         try:
@@ -238,23 +220,105 @@ class Create_Setting:
             print("找不到初始化設定，請先進行設定")
             return False
 
-    def Record_Pos(self):
-        listener = mouse.Listener(on_click=self.on_click)
-        print("請點擊開始對戰")
-        listener.start()
-        listener.join()
-
-    def Reset_Setting(self):
-        print("重新進行設定")
-        if os.path.exists("setting.json"):
-            os.remove("setting.json")
-
     def Get_Setting(self):
         return self.setting
 
 
+class Calibrate:
+    def __init__(self, setting):
+        self.setting = setting
+        self.cnt = 0
+
+    def start(self):
+        with mouse.Listener(on_click=self.listener) as listener:
+            print("開始校正\r\n請在開始列隊點擊右鍵\r\n")
+            listener.join()
+
+    def listener(self, x, y, button, pressed):
+        if pressed and button == Button.right:
+            if self.cnt == 0:
+                self.setting["start"] = [x, y]
+                print("請在接受對戰點擊右鍵")
+            elif self.cnt == 1:
+                self.setting["accept"] = [x, y]
+                print("請等待遊戲開始後")
+                print("請以右鍵點擊 D牌按紐")
+            elif self.cnt == 2:
+                self.setting["d_card"] = [x, y]
+                print("請以右鍵點擊升級")
+            elif self.cnt == 3:
+                self.setting["exp"] = [x, y]
+                print("請從左至右以右鍵點擊商店卡牌")
+            elif self.cnt == 4:
+                self.setting["shops"][0] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 5:
+                self.setting["shops"][1] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 6:
+                self.setting["shops"][2] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 7:
+                self.setting["shops"][3] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 8:
+                self.setting["shops"][4] = [x, y]
+                print("請依序以右鍵點擊手牌位置")
+            elif self.cnt == 9:
+                self.setting["owned"][0] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 10:
+                self.setting["owned"][1] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 11:
+                self.setting["owned"][2] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 12:
+                self.setting["owned"][3] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 13:
+                self.setting["owned"][4] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 14:
+                self.setting["owned"][5] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 15:
+                self.setting["owned"][6] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 16:
+                self.setting["owned"][7] = [x, y]
+                print("下一個位置")
+            elif self.cnt == 17:
+                self.setting["owned"][8] = [x, y]
+                print("請用右鍵點擊售出卡牌的位置")
+            elif self.cnt == 18:
+                self.setting["sell_pos"] = [x, y]
+                print("請用右鍵點擊齒輪位置")
+            elif self.cnt == 19:
+                self.setting["gear"] = [x, y]
+                print("請用右鍵點擊投降位置")
+            elif self.cnt == 20:
+                self.setting["surrender"] = [x, y]
+                print("請用右鍵點擊接受投降位置")
+            elif self.cnt == 21:
+                self.setting["sur_accept"] = [x, y]
+                print("請用右鍵點擊再來一場")
+            elif self.cnt == 22:
+                self.setting["new_game"] = [x, y]
+                print("請用右鍵點擊回到組隊房間")
+            elif self.cnt == 23:
+                self.setting["room"] = [x, y]
+                f = open("setting.json", "w")
+                content = json.dumps(self.setting)
+                f.write(content)
+                f.close()
+                print("校正完畢")
+                return False
+            self.cnt = self.cnt + 1
+
+
 if __name__ == "__main__":
-    print("版本 v1.0 2021/07/23 10:43")
+    print("版本 v1.0 2021/07/23 12.41")
     create_setting = Create_Setting()
     res = create_setting.Open_File()
 
@@ -262,7 +326,7 @@ if __name__ == "__main__":
         create_setting.Record_Pos()
 
     while True:
-        val = input("選擇工作\r\n1. 開始腳本\r\n2. 清除設定\r\n3. 檢視設定\r\n4. 離開\r\n")
+        val = input("選擇工作\r\n1. 開始腳本\r\n2. 清除設定\r\n3. 檢視設定\r\n4. 重新校正\r\n5. 離開\r\n")
         if val == "2":
             create_setting.Reset_Setting()
         elif val == "3":
@@ -281,7 +345,7 @@ if __name__ == "__main__":
             if loop_time == "":
                 loop_time = 10
 
-            actions = input("""選擇對戰中動作\r\n1. D牌\r\n2. 購買/售出旗子\r\n3. 升級\r\n""")
+            actions = input("""選擇對戰中動作\r\n0.不動作\r\n1. D牌\r\n2. 購買/售出旗子\r\n3. 升級\r\n""")
             if actions == "":
                 actions = 3
 
@@ -294,4 +358,7 @@ if __name__ == "__main__":
             )
             auto_move.Start_Loop()
         elif val == "4":
+            calibrate = Calibrate(create_setting.Get_Setting())
+            calibrate.start()
+        elif val == "5":
             break
