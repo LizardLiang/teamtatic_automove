@@ -37,5 +37,5 @@
     "drag-wait": 0.5,
     "move-wait": 1,
     "walk-wait": 3,
-    "proc_wait": 1
+    "proc-wait": 1
 }

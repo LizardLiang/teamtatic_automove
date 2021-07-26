@@ -23,7 +23,7 @@ class Auto_Move:
         self.drag_wait = self.positions["drag-wait"]
         self.move_wait = self.positions["move-wait"]
         self.walk_wait = self.positions["walk-wait"]
-        self.proc_wait = self.positions["porc-wait"]
+        self.proc_wait = self.positions["proc-wait"]
 
     def Press_Mouse(self, right=False):
         button = "right" if right else "left"
@@ -79,7 +79,7 @@ class Auto_Move:
                 # 跑列隊
                 if not queue_t.is_alive():
                     queue_t = threading.Thread(target=self.Do_Queue)
-                    print("第 {} 場掛機".format(loop_cnt))
+                    print("第 {} 場掛機".format(loop_cnt + 1))
                     queue_t.do_run = True
                     queue_t.start()
 
@@ -230,7 +230,6 @@ class Create_Setting:
             self.file = open("setting.json", "r")
             content = self.file.read()
             self.setting = json.loads(content)
-            print(self.setting)
             self.file.close()
             print("讀取設定完畢")
             return True
@@ -255,7 +254,7 @@ class Create_Setting:
 
 
 if __name__ == "__main__":
-    # main()
+    print("版本 v1.0 2021/07/23 10:43")
     create_setting = Create_Setting()
     res = create_setting.Open_File()
 
@@ -282,12 +281,7 @@ if __name__ == "__main__":
             if loop_time == "":
                 loop_time = 10
 
-            actions = input(
-                "選擇對戰中動作\r\n \
-                                1. D牌\r\n \
-                                2. 購買/售出旗子\r\n \
-                                3. 升級\r\n"
-            )
+            actions = input("""選擇對戰中動作\r\n1. D牌\r\n2. 購買/售出旗子\r\n3. 升級\r\n""")
             if actions == "":
                 actions = 3
 
