@@ -1,0 +1,8 @@
+*.spec
+__pycache__/
+build/
+dist/
+*.cfg
+.vscode/
+Lib/
+Scripts/
