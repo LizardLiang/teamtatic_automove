@@ -8,30 +8,25 @@
 2. 循環場數可調
 3. 按鍵座標可重新設定
 
-## Functions I tried
+## 設定
 
-```python
-def MovePos():
-    t = threading.currentThread()
-    screen_size = pyautogui.size()
+> 以下皆為按鈕座標
 
-    Position = get_basic_pos(screen_size.width, screen_size.height)
-
-    # for process in psutil.process_iter():
-    #     print(process)
-
-    while getattr(t, "do_run", True):
-        for pos in Position:
-            pyautogui.moveTo(pos[0], pos[1])
-            time.sleep(3)
-
-
-def main():
-    countdown_t = threading.Thread(target=CountDown, args=(10,))
-    movePos_t = threading.Thread(target=MovePos)
-    countdown_t.start()
-    movePos_t.start()
-
-    countdown_t.join()
-    movePos_t.do_run = False
-```
+1. "start": 開始列隊
+2. "accept": 接受對戰
+3. "surrender": 投降
+4. "sur_accept": 投降確認
+5. "new_game": 再來一場
+6. "gear": 齒輪位置
+7. "d_card": D 牌
+8. "exp": 升級
+9. "shops": 商店棋子 共五個
+10. "owned": 手牌棋子 共八個
+11. "sell_pos": 出售位置
+12. "wandering": 遊走位置 數量不限 數量越多 走的時間越長
+13. "room": 回到組隊房間按鈕
+14. "click-wait": 按下左鍵時到放開左鍵的間隔
+15. "drag-wait": 當拖拉棋子至販售區時，按下左鍵/移動至販售點/放開左鍵，三者之間的間隔
+16. "move-wait": 移動滑鼠到指定地點後的間隔，用於點擊按鈕，移至該位置後到觸發左鍵之間隔
+17. "walk-wait": 遊走時從按下右鍵到另一個右鍵按下的間隔
+18. "proc_wait": 掃描遊戲端是否關閉的間隔
