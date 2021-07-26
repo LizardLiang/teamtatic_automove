@@ -6,3 +6,5 @@ dist/
 .vscode/
 Lib/
 Scripts/
+*.bat
+server.py
