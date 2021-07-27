@@ -375,7 +375,7 @@ g_reso_msg = ["1920 x 1080", "2560 x 1440", "3840 x 2160"]
 action_msg = ["不動作", "D牌", "購買/售出 棋子", "升級"]
 
 if __name__ == "__main__":
-    print("版本 v1.0 2021/07/23 修改忘記把預設寫入存檔版")
+    print("正式版本 v1.0")
     create_setting = Create_Setting()
     res = create_setting.Open_File()
 
