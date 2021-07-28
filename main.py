@@ -2,175 +2,241 @@ import psutil
 import pyautogui
 from pynput import mouse
 from pynput.mouse import Button
+
+from python_imagesearch.imagesearch import imagesearch
+
 import time
 import threading
 import json
 import os
 import math
 
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+
+import ui
+
 game_name = "League of Legends.exe"
 test_name = "LINE.exe"
 
+image_accept = "./images/accept.png"  # 接受對戰
+image_again = "./images/again.png"  # 再來一場
+image_bball = "./images/b_ball.png"  # 藍色晶球
+image_closeesc = "./images/close_esc.png"  # 關閉設定
+image_cost1 = "./images/cost_1.png"  # 一費牌
+image_cost2 = "./images/cost_2.png"  # 二費牌
+image_cost3 = "./images/cost_3.png"  # 三費牌
+image_cost4 = "./images/cost_4.png"  # 四費牌
+image_d = "./images/d.png"  # D牌
+image_exp = "./images/exp.png"  # 升級
+image_gear = "./images/gear.png"  # 齒輪
+image_inroom = "./images/in_room.png"  # 進入組隊房間
+image_modecon = "./images/mode_confirm.png"  # 模式確認
+image_mode = "./images/mode.png"  # 選擇模式
+image_queue = "./images/queue.png"  # 進行列隊
+image_room = "./images/room.png"  # 回到房間
+image_shopbl = "./images/shop_bl.png"  # 商店左下
+image_shoptr = "./images/shop_tr.png"  # 商店右上
+image_suraccept = "./images/sur_accept.png"  # 投降確認
+image_sur = "./images/sur.png"  # 投降按紐
+image_wball = "./images/w_ball.png"  # 白色晶球
 
-class Auto_Move:
-    def __init__(self, wait_time, loop_time, positions, actions, calc):
+
+class Auto_Move(threading.Thread):
+    def __init__(
+        self, wait_time, loop_time, positions, wander, d, exp, shop, name="Auto_Move"
+    ):
+        self._stopevent = threading.Event()
         self.wait_time = float(wait_time)
         self.loop_time = int(loop_time)
         self.positions = positions
         self.is_playing = False
         self.timeup = False
-        self.actions = actions
+        self.wander = wander
+        self.d = d
+        self.exp = exp
+        self.shop = shop
         self.click_wait = self.positions["click-wait"]
         self.drag_wait = self.positions["drag-wait"]
         self.move_wait = self.positions["move-wait"]
         self.walk_wait = self.positions["walk-wait"]
         self.proc_wait = self.positions["proc-wait"]
-        self.calc = calc
+        self.kill_flag = False
+        self.cnt = 0
+
+        self.room_cnt = 0  # 幾次列隊之後要按回到組隊房間
+        self.wander_cnt = 0  # 對戰中幾次動作之後要遊走
+        threading.Thread.__init__(self, name=name)
 
     def Press_Mouse(self, right=False):
         button = "right" if right else "left"
         pyautogui.mouseDown(button=button)
         time.sleep(self.click_wait)
         pyautogui.mouseUp(button=button)
+        time.sleep(self.click_wait)
 
     def CountDown(self):
-        print("將於 {}分鐘後進行投降".format(self.wait_time))
-        time.sleep(math.floor(self.wait_time * 60))
-        self.timeup = True
         print("開始投降")
+        self.timeup = True
 
-    def Start_Loop(self):
+    def run(self):
         loop_cnt = 0
 
         # 三個狀態 三個線程
-        queue_t = threading.Thread(target=self.Do_Queue)
-        play_t = threading.Thread(target=self.Do_Play)
-        countdown_t = threading.Thread(target=self.CountDown)
+        self.countdown_t = threading.Timer(self.wait_time * 60, self.CountDown)
 
+        self.room_cnt = 0
+
+        print("第 {} 場掛機".format(loop_cnt + 1))
         # 依照使用者輸入 進行場次的對戰
-        while loop_cnt < self.loop_time:
+        while loop_cnt < self.loop_time and not self._stopevent.isSet():
+            find_game = False
             for proc in psutil.process_iter():
-                if proc.name() == game_name and not self.is_playing:
-                    # 找到這個執行緒 代表遊戲開始
-                    self.is_playing = True
+                if proc.name() == game_name:
+                    find_game = True
+                    if not self.is_playing:
+                        # 找到這個執行緒 代表遊戲開始
+                        print("進入對戰")
+                        self.countdown_t.start()
+                        self.is_playing = True
+
+            # 如果沒有找到執行緒，且目前為遊玩中，表示遊戲結束
+            if not find_game and self.is_playing:
+                loop_cnt = loop_cnt + 1
+
+                # 如果正在玩 且 正在等待投降 且 時間到了
+                self.room_cnt = 0
+                self.wander_cnt = 0
+                self.countdown_t.join()
+                self.is_playing = False
+                self.timeup = False
+                print("對戰結束初始化完成")
 
             if self.is_playing:
                 # 跑等投降
-                if not play_t.is_alive():
-                    play_t = threading.Thread(target=self.Do_Play)
-                    countdown_t = threading.Thread(target=self.CountDown)
-                    self.timeup = False
-                    countdown_t.start()
-                    play_t.start()
-                    while not play_t.is_alive():
-                        pass
+                if not self.timeup:
+                    self.Do_Play()
+                    time.sleep(1)
+                # 如果遊玩中，但時間到了，進行投降
                 elif self.timeup:
-                    # 如果正在玩 且 正在等待投降 且 時間到了
-                    tmp = True
-                    while tmp or play_t.is_alive():
-                        tmp = False
-                        for proc in psutil.process_iter():
-                            if proc.name() == game_name:
-                                tmp = True
-                        time.sleep(self.proc_wait)
-
-                    loop_cnt = loop_cnt + 1
+                    self.Surrender_Task()
 
             else:
                 # 跑列隊
-                if not queue_t.is_alive():
-                    queue_t = threading.Thread(target=self.Do_Queue)
-                    print("第 {} 場掛機".format(loop_cnt + 1))
-                    queue_t.start()
-                    while not queue_t.is_alive():
-                        pass
+                print("do queue task")
+                self.Do_Queue()
+
+        self.is_playing = True
+        self.timeup = True
+
+    def Find_(self, pic):
+        return pyautogui.locateCenterOnScreen(pic, confidence=0.8)
 
     def Do_Queue(self):
         # 列隊中
-        print("開始列隊")
-        t = threading.currentThread()
+        start_pos = self.Find_(image_queue)
 
-        room_cnt = 0
-        while not self.is_playing:
-            # 點擊 開始遊戲
-            self.MoveTo(self.calc.calc_client(self.positions["new_game"]))
-            self.Press_Mouse()
-            # 點擊 開始遊戲
-            self.MoveTo(self.calc.calc_client(self.positions["start"]))
-            self.Press_Mouse()
+        if not start_pos:
+            room_pos = self.Find_(image_room)
 
-            # 點擊 接受對戰
-            self.MoveTo(self.calc.calc_client(self.positions["accept"]))
-            self.Press_Mouse()
-
-            if room_cnt > 10:
-                self.MoveTo(self.calc.calc_client(self.positions["room"]))
+            if room_pos != None:
+                print("找到建立遊戲")
+                # 點擊 開始遊戲
+                self.MoveTo(room_pos)
                 self.Press_Mouse()
-                room_cnt = 0
-            else:
-                room_cnt = room_cnt + 1
+
+            mode_pos = self.Find_(image_mode)
+
+            if mode_pos != None:
+                print("找到模式")
+                self.MoveTo(mode_pos)
+                self.Press_Mouse()
+
+            confirm_pos = self.Find_(image_modecon)
+
+            if confirm_pos != None:
+                print("找到建立模式")
+                self.MoveTo(confirm_pos)
+                self.Press_Mouse()
+
+        start_pos = self.Find_(image_queue)
+
+        if start_pos != None:
+            print("找到開始列隊")
+            # 點擊 開始遊戲
+            self.MoveTo([start_pos[0] + 10, start_pos[1]])
+            self.Press_Mouse()
+
+        accept_pos = self.Find_(image_accept)
+
+        if accept_pos != None:
+            print("找到接受對戰")
+            # 點擊 接受對戰
+            self.MoveTo(self.positions["accept"])
+            self.Press_Mouse()
 
     def Do_Play(self):
         # 遊玩中
-        print("進入對戰")
-        t = threading.currentThread()
-        wander_cnt = 0
-        while not self.timeup:
-            if wander_cnt > self.positions["walk-cooldown"] and self.actions != 0:
-                wander_cnt = 0
-                self.Wandering()
-                if self.timeup:
-                    break
-            else:
-                wander_cnt = wander_cnt + 1
-
-            if self.actions == 1:
-                self.D_Card()
-            elif self.actions == 2:
-                self.Shops()
-                if not self.timeup:
-                    break
-                self.Sell_Card()
-            elif self.actions == 3:
-                self.Get_Exp()
-
-        tmp = True
-        while tmp:
-            tmp = False
-            self.Surrender_Task()
-            for proc in psutil.process_iter():
-                if proc.name() == game_name:
-                    tmp = True
-        # 遊戲結束 轉為列隊
-        self.is_playing = False
+        if self.d:
+            self.D_Card()
+        if self.shop:
+            self.Shops()
+            if self.timeup:
+                return
+            self.Sell_Card()
+        if self.exp:
+            self.Get_Exp()
 
     def Surrender_Task(self):
-        # 移到齒輪
-        self.MoveTo(self.positions["gear"])
-        # 按左鍵
-        self.Press_Mouse()
-        # 移到投降
-        self.MoveTo(self.positions["surrender"])
-        # 按左鍵
-        self.Press_Mouse()
-        # 移到確定投降
-        self.MoveTo(self.positions["sur_accept"])
-        # 按左鍵
-        self.Press_Mouse()
-        # 移至關閉設定
-        self.MoveTo(self.positions["close_setting"])
-        # 按下左鍵
-        self.Press_Mouse()
+        gear_pos = self.Find_(image_gear)
 
-        time.sleep(10)
+        if gear_pos != None:
+            print("找到齒輪")
+            # 移到齒輪
+            self.MoveTo(self.positions["gear"])
+            # 按左鍵
+            self.Press_Mouse()
+
+        sur_pos = self.Find_(image_sur)
+
+        if sur_pos != None:
+            # 移到投降
+            self.MoveTo(self.positions["surrender"])
+            # 按左鍵
+            self.Press_Mouse()
+
+        sur_pos = self.Find_(image_suraccept)
+
+        if sur_pos != None:
+            print("找到投降確認")
+            # 移到確定投降
+            self.MoveTo(self.positions["sur_accept"])
+            # 按左鍵
+            self.Press_Mouse()
+
+        close_pos = self.Find_(image_closeesc)
+
+        if close_pos != None:
+            # 移至關閉設定
+            self.MoveTo(self.positions["close_setting"])
+            # 按下左鍵
+            self.Press_Mouse()
 
     def D_Card(self):
-        self.MoveTo(self.positions["d_card"])
-        self.Press_Mouse()
+        pos = self.Find_(image_d)
+        if pos != None:
+            print("找到 d 牌")
+            self.MoveTo(pos)
+            self.Press_Mouse()
 
     def Get_Exp(self):
-        self.MoveTo(self.positions["exp"])
-        self.Press_Mouse()
+        pos = self.Find_(image_exp)
+        if pos != None:
+            print("找到升級")
+            self.MoveTo(pos)
+            self.Press_Mouse()
 
     def Shops(self):
         for index, card in enumerate(self.positions["shops"]):
@@ -206,46 +272,14 @@ class Auto_Move:
         pyautogui.mouseUp()
         time.sleep(self.drag_wait)
 
+    def get_remain_time(self):
+        return self.wait_time - self.cnt
 
-class Auto_Cal:
-    def __init__(self, client, game):
-        # client
-        # 1800 x 900, 1280 x 720, 1024 x 576
-        if client == 1:
-            self.c_width = 1800
-            self.c_height = 900
-        elif client == 2:
-            self.c_width = 1280
-            self.c_height = 720
-        elif client == 3:
-            self.c_width = 1024
-            self.c_height = 576
-
-        # game
-        # 1920 x 1080, 2560 x 1440, 3840 x 2160
-        if game == 1:
-            self.g_width = 1920
-            self.g_height = 1080
-        elif game == 2:
-            self.g_width = 2560
-            self.g_height = 1440
-        elif game == 3:
-            self.g_width = 3840
-            self.g_height = 2160
-
-        self.w_zero = 1920 / 2
-        self.h_zero = 1080 / 2
-
-    # 計算客戶端按鈕位置
-    def calc_client(self, pos):
-        new_w_zero = self.g_width / 2
-        new_h_zero = self.g_height / 2
-
-        # 原本的距離 x 客戶端的比率 加到新的中心點
-        new_w = (pos[0] - self.w_zero) * (self.c_width / 1280) + new_w_zero
-        new_h = (pos[1] - self.h_zero) * (self.c_height / 720) + new_h_zero
-
-        return [new_w, new_h]
+    def kill_(self, timeout=None):
+        self.countdown_t.cancel()
+        self._stopevent.set()
+        threading.Thread.join(self, timeout)
+        return True
 
 
 class Create_Setting:
@@ -277,182 +311,94 @@ class Create_Setting:
         print("已存入新預設值")
 
 
-class Calibrate:
-    def __init__(self, setting):
-        self.setting = setting
-        self.cnt = 0
+class Main(QMainWindow, ui.Ui_JustAScript):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
 
-    def start(self):
-        with mouse.Listener(on_click=self.listener) as listener:
-            print("開始校正\r\n請在開始列隊點擊右鍵\r\n")
-            listener.join()
+        self.settings = Create_Setting()
+        self.settings.Open_File()
 
-    def listener(self, x, y, button, pressed):
-        if pressed and button == Button.right:
-            if self.cnt == 0:
-                self.setting["start"] = [x, y]
-                print("請在接受對戰點擊右鍵")
-            elif self.cnt == 1:
-                self.setting["accept"] = [x, y]
-                print("請等待遊戲開始後")
-                print("請以右鍵點擊 D牌按紐")
-            elif self.cnt == 2:
-                self.setting["d_card"] = [x, y]
-                print("請以右鍵點擊升級")
-            elif self.cnt == 3:
-                self.setting["exp"] = [x, y]
-                print("請從左至右以右鍵點擊商店卡牌")
-            elif self.cnt == 4:
-                self.setting["shops"][0] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 5:
-                self.setting["shops"][1] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 6:
-                self.setting["shops"][2] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 7:
-                self.setting["shops"][3] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 8:
-                self.setting["shops"][4] = [x, y]
-                print("請依序以右鍵點擊手牌位置")
-            elif self.cnt == 9:
-                self.setting["owned"][0] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 10:
-                self.setting["owned"][1] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 11:
-                self.setting["owned"][2] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 12:
-                self.setting["owned"][3] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 13:
-                self.setting["owned"][4] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 14:
-                self.setting["owned"][5] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 15:
-                self.setting["owned"][6] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 16:
-                self.setting["owned"][7] = [x, y]
-                print("下一個位置")
-            elif self.cnt == 17:
-                self.setting["owned"][8] = [x, y]
-                print("請用右鍵點擊售出卡牌的位置")
-            elif self.cnt == 18:
-                self.setting["sell_pos"] = [x, y]
-                print("請用右鍵點擊齒輪位置")
-            elif self.cnt == 19:
-                self.setting["gear"] = [x, y]
-                print("請用右鍵點擊投降位置")
-            elif self.cnt == 20:
-                self.setting["surrender"] = [x, y]
-                print("請用右鍵點擊接受投降位置")
-            elif self.cnt == 21:
-                self.setting["sur_accept"] = [x, y]
-                print("請用右鍵點擊再來一場")
-            elif self.cnt == 22:
-                self.setting["new_game"] = [x, y]
-                print("請用右鍵點擊回到組隊房間")
-            elif self.cnt == 23:
-                self.setting["room"] = [x, y]
-                f = open("setting.json", "w")
-                content = json.dumps(self.setting)
-                f.write(content)
-                f.close()
-                print("校正完畢")
-                return False
-            self.cnt = self.cnt + 1
+        self.setting = self.settings.Get_Setting()
 
+        self.use_wander = False
+        self.use_d = False
+        self.use_exp = False
+        self.use_shop = False
 
-c_reso_msg = ["1800 x 900", "1280 x 760", "1024 x 576"]
-g_reso_msg = ["1920 x 1080", "2560 x 1440", "3840 x 2160"]
-action_msg = ["不動作", "D牌", "購買/售出 棋子", "升級"]
+        self.wandering.stateChanged.connect(self.set_wander)
+        self.d_card.stateChanged.connect(self.set_d)
+        self.exp.stateChanged.connect(self.set_exp)
+        self.shop.stateChanged.connect(self.set_shop)
+
+        self.surrs = self.setting["default"]["surrender-time"]
+        self.loops = self.setting["default"]["loop-times"]
+
+        self.sur_time.setValue(self.surrs)
+        self.loop_time.setValue(self.loops)
+
+        self.sur_time.valueChanged.connect(self.set_sur_value)
+        self.loop_time.valueChanged.connect(self.set_loop_value)
+
+        self.start.clicked.connect(self.Start)
+        self.stop.clicked.connect(self.Stop)
+
+        self.loop = Auto_Move(
+            self.surrs,
+            self.loops,
+            self.setting,
+            self.use_wander,
+            self.use_d,
+            self.use_exp,
+            self.use_shop,
+        )
+
+    def set_sur_value(self):
+        self.surrs = int(self.sur_time.value())
+
+    def set_loop_value(self):
+        self.loops = int(self.loop_time.value())
+
+    def set_wander(self):
+        if self.wandering.isChecked():
+            self.use_wander = True
+        else:
+            self.use_wander = False
+
+    def set_d(self):
+        self.use_d = True if self.d_card.isChecked() else False
+
+    def set_exp(self):
+        self.use_exp = True if self.exp.isChecked() else False
+
+    def set_shop(self):
+        self.use_shop = True if self.shop.isChecked() else False
+
+    def Start(self):
+        self.loop = Auto_Move(
+            self.surrs,
+            self.loops,
+            self.setting,
+            self.use_wander,
+            self.use_d,
+            self.use_exp,
+            self.use_shop,
+        )
+        self.loop.start()
+
+    def closeEvent(self, event):
+        self.loop.kill_()
+        print("close")
+
+    def Stop(self):
+        self.loop.kill_()
+
 
 if __name__ == "__main__":
     print("正式版本 v1.0")
-    create_setting = Create_Setting()
-    res = create_setting.Open_File()
+    import sys
 
-    if not res:
-        create_setting.Record_Pos()
-
-    while True:
-        val = input("選擇工作\r\n1. 開始腳本\r\n2. 重新校正\r\n3. 離開\r\n")
-        if val == "1":
-            setting = create_setting.Get_Setting()
-            use_default = input("使用預設值(是)?\r\n1. 是\r\n2. 否\r\n")
-            wait_time, loop_time, actions, c_reso, g_reso = "", "", "", "", ""
-
-            if use_default == "2":
-                wait_time = input("輸入投降時間 單位: 分鐘\r\n")
-                if wait_time == "":
-                    wait_time = 13
-
-                loop_time = input("輸入掛機場數\r\n")
-                if loop_time == "":
-                    loop_time = 10
-
-                actions = input(
-                    """選擇對戰中動作\r\n0.不動作\r\n1. D牌\r\n2. 購買/售出旗子\r\n3. 升級\r\n"""
-                )
-                if actions == "":
-                    actions = 3
-
-                c_reso = input(
-                    "請選擇客戶端大小\r\n1. 1800 x 900\r\n2. 1280 x 720\r\n3. 1024 x 576\r\n"
-                )
-                if c_reso == "" or int(c_reso) > 3 or int(c_reso) < 1:
-                    c_reso = 2
-
-                g_reso = input(
-                    "請選擇螢幕大小\r\n1. 1920 x 1080\r\n2. 2560 x 1440\r\n3. 3840 x 2160\r\n"
-                )
-                if g_reso == "" or int(g_reso) > 3 or int(g_reso) < 1:
-                    g_reso = 1
-
-                values = setting["default"]
-                values["surrender-time"] = float(wait_time)
-                values["loop-times"] = int(loop_time)
-                values["action"] = int(actions)
-                values["client-reso"] = int(c_reso)
-                values["monitor-reso"] = int(g_reso)
-
-                setting["default"] = values
-                create_setting.Write_Setting(setting)
-
-            else:
-                values = setting["default"]
-                wait_time = values["surrender-time"]
-                loop_time = values["loop-times"]
-                actions = values["action"]
-                c_reso = values["client-reso"]
-                g_reso = values["monitor-reso"]
-
-            print("本次掛機將在 {}分鐘後進行投降，並且遊玩 {}場".format(float(wait_time), int(loop_time)))
-            print(
-                "設定:\r\n動作: {}\r\n客戶端解析度: {}\r\n螢幕解析度: {}\r\n".format(
-                    action_msg[int(actions)],
-                    c_reso_msg[int(c_reso) - 1],
-                    g_reso_msg[int(g_reso) - 1],
-                )
-            )
-
-            auto_move = Auto_Move(
-                float(wait_time),
-                int(loop_time),
-                setting,
-                int(actions),
-                Auto_Cal(int(c_reso), int(g_reso)),
-            )
-            auto_move.Start_Loop()
-        elif val == "2":
-            calibrate = Calibrate(create_setting.Get_Setting())
-            calibrate.start()
-        elif val == "3":
-            break
+    app = QtWidgets.QApplication(sys.argv)
+    window = Main()
+    window.show()
+    sys.exit(app.exec_())
