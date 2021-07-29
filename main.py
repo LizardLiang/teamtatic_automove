@@ -11,6 +11,8 @@ import json
 import os
 import math
 
+from PIL import Image
+
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -21,27 +23,27 @@ import ui
 game_name = "League of Legends.exe"
 test_name = "LINE.exe"
 
-image_accept = "./images/accept.png"  # 接受對戰
-image_again = "./images/again.png"  # 再來一場
-image_bball = "./images/b_ball.png"  # 藍色晶球
-image_closeesc = "./images/close_esc.png"  # 關閉設定
-image_cost1 = "./images/cost_1.png"  # 一費牌
-image_cost2 = "./images/cost_2.png"  # 二費牌
-image_cost3 = "./images/cost_3.png"  # 三費牌
-image_cost4 = "./images/cost_4.png"  # 四費牌
-image_d = "./images/d.png"  # D牌
-image_exp = "./images/exp.png"  # 升級
-image_gear = "./images/gear.png"  # 齒輪
-image_inroom = "./images/in_room.png"  # 進入組隊房間
-image_modecon = "./images/mode_confirm.png"  # 模式確認
-image_mode = "./images/mode.png"  # 選擇模式
-image_queue = "./images/queue.png"  # 進行列隊
-image_room = "./images/room.png"  # 回到房間
-image_shopbl = "./images/shop_bl.png"  # 商店左下
-image_shoptr = "./images/shop_tr.png"  # 商店右上
-image_suraccept = "./images/sur_accept.png"  # 投降確認
-image_sur = "./images/sur.png"  # 投降按紐
-image_wball = "./images/w_ball.png"  # 白色晶球
+image_accept = "./n_images/accept.png"  # 接受對戰
+image_again = "./n_images/again.png"  # 再來一場
+image_bball = "./n_images/b_ball.png"  # 藍色晶球
+image_closeesc = "./n_images/close_esc.png"  # 關閉設定
+image_cost1 = "./n_images/cost_1.png"  # 一費牌
+image_cost2 = "./n_images/cost_2.png"  # 二費牌
+image_cost3 = "./n_images/cost_3.png"  # 三費牌
+image_cost4 = "./n_images/cost_4.png"  # 四費牌
+image_d = "./n_images/d.png"  # D牌
+image_exp = "./n_images/exp.png"  # 升級
+image_gear = "./n_images/gear.png"  # 齒輪
+image_inroom = "./n_images/in_room.png"  # 進入組隊房間
+image_modecon = "./n_images/mode_confirm.png"  # 模式確認
+image_mode = "./n_images/mode.png"  # 選擇模式
+image_queue = "./n_images/queue.png"  # 進行列隊
+image_room = "./n_images/room.png"  # 回到房間
+image_shopbl = "./n_images/shop_bl.png"  # 商店左下
+image_shoptr = "./n_images/shop_tr.png"  # 商店右上
+image_suraccept = "./n_images/sur_accept.png"  # 投降確認
+image_sur = "./n_images/sur.png"  # 投降按紐
+image_wball = "./n_images/w_ball.png"  # 白色晶球
 
 
 class Auto_Move(threading.Thread):
@@ -49,11 +51,22 @@ class Auto_Move(threading.Thread):
         self, wait_time, loop_time, positions, wander, d, exp, shop, name="Auto_Move"
     ):
         self._stopevent = threading.Event()
+
+        # 找出解析度
+        self.pic_prefix = "./n_images/1080p"
+        self.pic_cnt = 3
+        w, h = pyautogui.size()
+        if w == 2560:
+            self.pic_prefix = "./n_images/2k"
+            self.pic_cnt = 4
+
         self.wait_time = float(wait_time)
         self.loop_time = int(loop_time)
         self.positions = positions
         self.is_playing = False
         self.timeup = False
+
+        # 掛機設定
         self.wander = wander
         self.d = d
         self.exp = exp
@@ -65,9 +78,9 @@ class Auto_Move(threading.Thread):
         self.proc_wait = self.positions["proc-wait"]
         self.kill_flag = False
         self.cnt = 0
-
         self.room_cnt = 0  # 幾次列隊之後要按回到組隊房間
         self.wander_cnt = 0  # 對戰中幾次動作之後要遊走
+
         threading.Thread.__init__(self, name=name)
 
     def Press_Mouse(self, right=False):
@@ -132,50 +145,110 @@ class Auto_Move(threading.Thread):
         self.timeup = True
 
     def Find_(self, pic):
-        return pyautogui.locateCenterOnScreen(pic, confidence=0.8)
+        return pyautogui.locateCenterOnScreen(pic, confidence=0.9)
+
+    def search_mode(self):
+        for i in range(self.pic_cnt):
+            mode_name = self.pic_prefix + "/mode_" + str(i + 1) + ".png"
+
+            pos = pyautogui.locateCenterOnScreen(mode_name, confidence=0.9)
+
+            if pos != None:
+                print("Find!")
+                return pos
+
+        return None
+
+    def in_room(self):
+        for i in range(self.pic_cnt):
+            im_name = self.pic_prefix + "/in_room_" + str(i + 1) + ".png"
+
+            pos = pyautogui.locateCenterOnScreen(im_name, confidence=0.9)
+            if pos != None:
+                return True
+        return False
+
+    def mode_selected(self):
+        for i in range(self.pic_cnt):
+            im_name = self.pic_prefix + "/mode_con_" + str(i + 1) + ".png"
+
+            pos = pyautogui.locateCenterOnScreen(im_name, confidence=0.9)
+            if pos != None:
+                return True
+        return False
+
+    def search_room(self):
+        for i in range(self.pic_cnt):
+            im_name = self.pic_prefix + "/room_" + str(i + 1) + ".png"
+
+            pos = pyautogui.locateCenterOnScreen(im_name, confidence=0.9)
+            if pos != None:
+                return pos
+
+        return None
+
+    def search_queue(self):
+        for i in range(self.pic_cnt):
+            im_name = self.pic_prefix + "/queue_" + str(i + 1) + ".png"
+
+            pos = pyautogui.locateCenterOnScreen(im_name, confidence=0.9)
+
+            if pos != None:
+                return pos
+
+        return None
+
+    def search_accept(self):
+        for i in range(self.pic_cnt):
+            im_name = self.pic_prefix + "/accept_" + str(i + 1) + ".png"
+
+            pos = pyautogui.locateCenterOnScreen(im_name, confidence=0.8)
+
+            if pos != None:
+                return pos
+        return None
 
     def Do_Queue(self):
         # 列隊中
-        start_pos = self.Find_(image_queue)
+        if self.in_room():
+            print("在組隊房間")
+            start_pos = self.search_queue()
 
-        if not start_pos:
-            room_pos = self.Find_(image_room)
+            if start_pos != None:
+                print("找到開始列隊")
+                # 點擊 開始遊戲
+                self.MoveTo(start_pos)
+                self.Press_Mouse()
+
+            accept_pos = self.search_accept()
+
+            if accept_pos != None:
+                print(accept_pos)
+                print("找到接受對戰")
+                # 點擊 接受對戰
+                self.MoveTo(accept_pos)
+                # self.Press_Mouse()
+        else:
+            room_pos = self.search_room()
 
             if room_pos != None:
-                print("找到建立遊戲")
-                # 點擊 開始遊戲
                 self.MoveTo(room_pos)
                 self.Press_Mouse()
 
-            mode_pos = self.Find_(image_mode)
+            mode_pos = self.search_mode()
 
             if mode_pos != None:
                 print("找到模式")
                 self.MoveTo(mode_pos)
                 self.Press_Mouse()
 
-            confirm_pos = self.Find_(image_modecon)
+            selected = self.mode_selected()
 
-            if confirm_pos != None:
-                print("找到建立模式")
-                self.MoveTo(confirm_pos)
-                self.Press_Mouse()
-
-        start_pos = self.Find_(image_queue)
-
-        if start_pos != None:
-            print("找到開始列隊")
-            # 點擊 開始遊戲
-            self.MoveTo([start_pos[0] + 10, start_pos[1]])
-            self.Press_Mouse()
-
-        accept_pos = self.Find_(image_accept)
-
-        if accept_pos != None:
-            print("找到接受對戰")
-            # 點擊 接受對戰
-            self.MoveTo(self.positions["accept"])
-            self.Press_Mouse()
+            if selected:
+                confirm_pos = self.search_queue()
+                if confirm_pos != None:
+                    self.MoveTo(confirm_pos)
+                    self.Press_Mouse()
 
     def Do_Play(self):
         # 遊玩中
@@ -276,7 +349,8 @@ class Auto_Move(threading.Thread):
         return self.wait_time - self.cnt
 
     def kill_(self, timeout=None):
-        self.countdown_t.cancel()
+        if self.countdown_t != None:
+            self.countdown_t.cancel()
         self._stopevent.set()
         threading.Thread.join(self, timeout)
         return True
@@ -342,6 +416,7 @@ class Main(QMainWindow, ui.Ui_JustAScript):
 
         self.start.clicked.connect(self.Start)
         self.stop.clicked.connect(self.Stop)
+        self.stop.setEnabled(False)
 
         self.loop = Auto_Move(
             self.surrs,
@@ -352,6 +427,8 @@ class Main(QMainWindow, ui.Ui_JustAScript):
             self.use_exp,
             self.use_shop,
         )
+
+        self.run_flag = False
 
     def set_sur_value(self):
         self.surrs = int(self.sur_time.value())
@@ -375,23 +452,31 @@ class Main(QMainWindow, ui.Ui_JustAScript):
         self.use_shop = True if self.shop.isChecked() else False
 
     def Start(self):
-        self.loop = Auto_Move(
-            self.surrs,
-            self.loops,
-            self.setting,
-            self.use_wander,
-            self.use_d,
-            self.use_exp,
-            self.use_shop,
-        )
-        self.loop.start()
+        if not self.run_flag:
+            self.loop = Auto_Move(
+                self.surrs,
+                self.loops,
+                self.setting,
+                self.use_wander,
+                self.use_d,
+                self.use_exp,
+                self.use_shop,
+            )
+            self.run_flag = True
+            self.stop.setEnabled(True)
+            self.loop.start()
 
     def closeEvent(self, event):
-        self.loop.kill_()
+        if self.run_flag:
+            self.loop.kill_()
+            event.reject()
         print("close")
 
     def Stop(self):
-        self.loop.kill_()
+        if self.run_flag:
+            self.stop.setEnabled(False)
+            self.run_flag = False
+            self.loop.kill_()
 
 
 if __name__ == "__main__":
