@@ -21,7 +21,7 @@ from PyQt5.QtGui import *
 import ui
 
 game_name = "League of Legends.exe"
-test_name = "LINE.exe"
+test_name = "123.exe"
 
 image_accept = "./n_images/accept.png"  # 接受對戰
 image_again = "./n_images/again.png"  # 再來一場
@@ -89,6 +89,9 @@ class Auto_Move(threading.Thread):
         time.sleep(self.click_wait)
         pyautogui.mouseUp(button=button)
         time.sleep(self.click_wait)
+
+        if right:
+            time.sleep(5)
 
     def CountDown(self):
         print("開始投降")
@@ -217,40 +220,37 @@ class Auto_Move(threading.Thread):
             if start_pos != None:
                 print("找到開始列隊")
                 # 點擊 開始遊戲
-                self.MoveTo(start_pos)
-                self.Press_Mouse()
+                self.MoveNClick(start_pos)
 
             accept_pos = self.search_accept()
 
             if accept_pos != None:
-                print(accept_pos)
                 print("找到接受對戰")
                 # 點擊 接受對戰
-                self.MoveTo(accept_pos)
-                # self.Press_Mouse()
+                self.MoveNClick(accept_pos)
         else:
             room_pos = self.search_room()
 
             if room_pos != None:
-                self.MoveTo(room_pos)
-                self.Press_Mouse()
+                self.MoveNClick(room_pos)
 
             mode_pos = self.search_mode()
 
             if mode_pos != None:
                 print("找到模式")
-                self.MoveTo(mode_pos)
-                self.Press_Mouse()
+                self.MoveNClick(mode_pos)
 
             selected = self.mode_selected()
 
             if selected:
                 confirm_pos = self.search_queue()
                 if confirm_pos != None:
-                    self.MoveTo(confirm_pos)
-                    self.Press_Mouse()
+                    self.MoveNClick(confirm_pos)
 
     def Do_Play(self):
+        if self.wander:
+            self.search_ball()
+
         # 遊玩中
         if self.d:
             self.D_Card()
@@ -263,53 +263,38 @@ class Auto_Move(threading.Thread):
             self.Get_Exp()
 
     def Surrender_Task(self):
-        gear_pos = self.Find_(image_gear)
+        self.click_on_picture(image_gear)
+        self.click_on_picture(image_sur)
+        self.click_on_picture(image_suraccept)
+        self.click_on_picture(image_closeesc)
 
-        if gear_pos != None:
-            print("找到齒輪")
-            # 移到齒輪
-            self.MoveTo(self.positions["gear"])
-            # 按左鍵
-            self.Press_Mouse()
+    def MoveNClick(self, pos=[], right=False):
+        self.MoveTo(pos)
+        self.Press_Mouse(right)
 
-        sur_pos = self.Find_(image_sur)
+    def click_on_picture(self, pic="", confidence=0.9, right=False):
+        if pic == "":
+            return False
 
-        if sur_pos != None:
-            # 移到投降
-            self.MoveTo(self.positions["surrender"])
-            # 按左鍵
-            self.Press_Mouse()
+        pos = pyautogui.locateCenterOnScreen(pic, confidence=confidence)
 
-        sur_pos = self.Find_(image_suraccept)
+        if pos != None:
+            self.MoveNClick(pos, right)
+            return True
 
-        if sur_pos != None:
-            print("找到投降確認")
-            # 移到確定投降
-            self.MoveTo(self.positions["sur_accept"])
-            # 按左鍵
-            self.Press_Mouse()
+        return False
 
-        close_pos = self.Find_(image_closeesc)
-
-        if close_pos != None:
-            # 移至關閉設定
-            self.MoveTo(self.positions["close_setting"])
-            # 按下左鍵
-            self.Press_Mouse()
+    def search_ball(self):
+        self.click_on_picture("./images/w_ball.png", 0.9, True)
+        self.click_on_picture("./images/b_ball.png", 0.9, True)
+        self.click_on_picture("./images/g_ball.png", 0.9, True)
+        self.click_on_picture("./images/s_ball.png", 0.9, True)
 
     def D_Card(self):
-        pos = self.Find_(image_d)
-        if pos != None:
-            print("找到 d 牌")
-            self.MoveTo(pos)
-            self.Press_Mouse()
+        self.click_on_picture(image_d)
 
     def Get_Exp(self):
-        pos = self.Find_(image_exp)
-        if pos != None:
-            print("找到升級")
-            self.MoveTo(pos)
-            self.Press_Mouse()
+        self.click_on_picture(image_exp)
 
     def Shops(self):
         for index, card in enumerate(self.positions["shops"]):
