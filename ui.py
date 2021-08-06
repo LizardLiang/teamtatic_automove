@@ -123,6 +123,11 @@ class Ui_JustAScript(object):
         self.start.setObjectName("start")
         self.verticalLayout_3.addWidget(self.start)
         self.stop = QtWidgets.QPushButton(self.widget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.stop.sizePolicy().hasHeightForWidth())
+        self.stop.setSizePolicy(sizePolicy)
         self.stop.setStyleSheet("font: 18pt \"Agency FB\";\n"
 "color: rgb(255, 255, 255);")
         self.stop.setObjectName("stop")
@@ -148,19 +153,9 @@ class Ui_JustAScript(object):
         self.label.setText(_translate("JustAScript", "投降時間"))
         self.label_2.setText(_translate("JustAScript", "掛機次數"))
         self.label_3.setText(_translate("JustAScript", "動作選擇"))
-        self.wandering.setText(_translate("JustAScript", "是否遊走"))
+        self.wandering.setText(_translate("JustAScript", "是否撿球"))
         self.d_card.setText(_translate("JustAScript", "是否D牌"))
         self.exp.setText(_translate("JustAScript", "是否升級"))
         self.shop.setText(_translate("JustAScript", "是否買棋"))
         self.start.setText(_translate("JustAScript", "開始"))
         self.stop.setText(_translate("JustAScript", "停止"))
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    JustAScript = QtWidgets.QMainWindow()
-    ui = Ui_JustAScript()
-    ui.setupUi(JustAScript)
-    JustAScript.show()
-    sys.exit(app.exec_())

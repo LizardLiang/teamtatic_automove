@@ -10,6 +10,7 @@ import threading
 import json
 import os
 import math
+import requests
 
 from PIL import Image
 
@@ -19,6 +20,102 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
 import ui
+
+import discord
+from dotenv import load_dotenv
+
+from flask import Flask
+from flask import request
+import webbrowser
+import asyncio
+
+from rauth import OAuth2Service
+
+load_dotenv()
+access_token = ""
+auth_url = "https://discordapp.com/api/users/@me"
+
+app = Flask(__name__)
+
+auth_status = 0
+
+
+def get_id(token):
+    global auth_status
+    bearer = "Bearer " + token
+    res = requests.get(auth_url, headers={"Authorization": bearer})
+
+    data = json.loads(res.text)
+    id = data["id"]
+
+    res = requests.post("http://localhost:8091/auth", json={"id": id})
+    data = json.loads(res.text)
+    res = data["result"]
+
+    if res == "Success":
+        auth_status = 1
+    elif res == "Fail":
+        auth_status = 2
+
+    return res
+
+
+@app.route("/")
+def get_token():
+    # Get code from return
+    code = request.args.get("code")
+
+    # Post to token_url to get token
+    res = requests.post(
+        "https://discordapp.com/api/oauth2/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": "http://localhost:8090",
+        },
+        verify=False,
+        allow_redirects=False,
+        auth=(os.getenv("CLIENT_ID"), os.getenv("CLIENT_SECRET")),
+    )
+
+    # Response is application/json
+    data = json.loads(res.text)
+    token = data["access_token"]
+
+    # Use token to get user info
+    res = get_id(token)
+    return res
+
+
+def Run_Server():
+    server_thread = threading.Thread(
+        target=app.run, daemon=True, kwargs={"host": "0.0.0.0", "port": 8090}
+    )
+
+    server_thread.start()
+
+
+def Start_Auth():
+    service = OAuth2Service(
+        name="Discord",
+        client_id=os.getenv("CLIENT_ID"),
+        client_secret=os.getenv("CLIENT_SECRET"),
+        access_token_url="https://discordapp.com/api/oauth2/token",
+        authorize_url="https://discordapp.com/api/oauth2/authorize",
+        base_url="https://discordapp.com/",
+    )
+
+    params = {
+        "scope": "identify",
+        "redirect_url": "http://localhost:8090",
+        "grant_type": "authorization_code",
+        "response_type": "code",
+    }
+    session = service.get_authorize_url(**params)
+
+    # Open Auth Window
+    webbrowser.open(session, new=0, autoraise=True)
+
 
 game_name = "League of Legends.exe"
 test_name = "123.exe"
@@ -114,7 +211,7 @@ class Auto_Move(threading.Thread):
                     find_game = True
                     if not self.is_playing:
                         # 找到這個執行緒 代表遊戲開始
-                        print("進入對戰")
+                        # print("進入對戰")
                         self.countdown_t.start()
                         self.is_playing = True
 
@@ -141,7 +238,7 @@ class Auto_Move(threading.Thread):
 
             else:
                 # 跑列隊
-                print("do queue task")
+                # print("do queue task")
                 self.Do_Queue()
 
         self.is_playing = True
@@ -157,7 +254,7 @@ class Auto_Move(threading.Thread):
             pos = pyautogui.locateCenterOnScreen(mode_name, confidence=0.9)
 
             if pos != None:
-                print("Find!")
+                # print("Find!")
                 return pos
 
         return None
@@ -214,18 +311,18 @@ class Auto_Move(threading.Thread):
     def Do_Queue(self):
         # 列隊中
         if self.in_room():
-            print("在組隊房間")
+            # print("在組隊房間")
             start_pos = self.search_queue()
 
             if start_pos != None:
-                print("找到開始列隊")
+                # print("找到開始列隊")
                 # 點擊 開始遊戲
                 self.MoveNClick(start_pos)
 
             accept_pos = self.search_accept()
 
             if accept_pos != None:
-                print("找到接受對戰")
+                # print("找到接受對戰")
                 # 點擊 接受對戰
                 self.MoveNClick(accept_pos)
         else:
@@ -237,7 +334,7 @@ class Auto_Move(threading.Thread):
             mode_pos = self.search_mode()
 
             if mode_pos != None:
-                print("找到模式")
+                # print("找到模式")
                 self.MoveNClick(mode_pos)
 
             selected = self.mode_selected()
@@ -297,22 +394,15 @@ class Auto_Move(threading.Thread):
         self.click_on_picture(image_exp)
 
     def Shops(self):
-        for index, card in enumerate(self.positions["shops"]):
-            print("購買 第{}個旗子".format(index + 1))
-            self.MoveTo(card)
-            self.Press_Mouse()
+        for i in range(5):
+            name = "cost_" + str(i) + ".png"
+            self.click_on_picture(name, 0.9)
 
     def Sell_Card(self):
         for index, card in enumerate(self.positions["owned"]):
-            print("售出 第{}個旗子".format(index + 1))
+            # print("售出 第{}個旗子".format(index + 1))
             self.MoveTo(card)
             self.DragTo(self.positions["sell_pos"])
-
-    def Wandering(self):
-        for index, pos in enumerate(self.positions["wandering"]):
-            print(pos)
-            self.WalkThere(pos)
-            time.sleep(self.walk_wait)
 
     def MoveTo(self, position):
         pyautogui.moveTo(position[0], position[1])
@@ -401,6 +491,8 @@ class Main(QMainWindow, ui.Ui_JustAScript):
 
         self.start.clicked.connect(self.Start)
         self.stop.clicked.connect(self.Stop)
+
+        self.start.setEnabled(False)
         self.stop.setEnabled(False)
 
         self.loop = Auto_Move(
@@ -455,7 +547,7 @@ class Main(QMainWindow, ui.Ui_JustAScript):
         if self.run_flag:
             self.loop.kill_()
             event.reject()
-        print("close")
+        # print("close")
 
     def Stop(self):
         if self.run_flag:
@@ -468,7 +560,20 @@ if __name__ == "__main__":
     print("正式版本 v1.0")
     import sys
 
-    app = QtWidgets.QApplication(sys.argv)
+    app_ = QtWidgets.QApplication(sys.argv)
     window = Main()
     window.show()
-    sys.exit(app.exec_())
+
+    # 開始驗證
+    Run_Server()
+    Start_Auth()
+
+    while auth_status == 0:
+        print(f"等待驗證")
+        time.sleep(1)
+
+    if auth_status == 1:
+        print(f"驗證成功")
+    else:
+        print(f"驗證失敗")
+    sys.exit(app_.exec_())
